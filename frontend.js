@@ -1,6 +1,5 @@
 function log(argument) {
     console.log("log", argument)
-    m
 }
 
 function error(argument) {
@@ -23,7 +22,10 @@ var app = {
         return {
             files: files,
             path: m.prop((m.route.param("path") ? m.route.param("path") : "")),
-            jump: m.prop("")
+            jump: m.prop(""),
+            symlinkSource: m.prop(""),
+            symlinkTarget: m.prop(""),
+            createName: m.prop("")
         }
     },
     view: function(ctrl, args) {
@@ -50,29 +52,112 @@ function body(ctrl) {
                 oninput: m.withAttr("value", ctrl.jump)
             })
         ]),
+
+
         ctrl.files().type == "folder" ? generateLinks(ctrl, ctrl.files) : showContent(ctrl, ctrl.files)
     ])
 }
 
 function generateLinks(ctrl, files) {
-    return m("ul", files().content.map(function(file) {
-        return m("a", {
-            href: "javascript:void(0);",
-            onclick: function(e) {
-                ctrl.path(ctrl.path() + (ctrl.path() == "" ? "" : "/") + file)
+    return m("div", [
+        m("form", {
+            onsubmit: function(e) {
 
-                console.log(ctrl.path())
-                m.route("/", {
-                        path: ctrl.path()
-                    })
+                m.request({
+                        method: 'post',
+                        url: "/create",
+                        data: {
+                            type: "symlink",
+                            source: ctrl.symlinkSource(),
+                            target: ctrl.symlinkTarget()
+                        }
+                    }).then(m.route(m.route()))
                     // m.redraw()
+                e.preventDefault()
             }
-        }, file, m("br"))
-    }))
+        }, [
+
+            m("br"),
+            m("input", {
+                placeholder: "source",
+                oninput: m.withAttr("value", ctrl.symlinkSource)
+            }),
+            m("input", {
+                placeholder: "target",
+                oninput: m.withAttr("value", ctrl.symlinkTarget)
+            }),
+            m("button", "relative symlink!"),
+        ]),
+
+        m("form", {
+            onsubmit: function(e) {
+                e.preventDefault()
+            }
+        }, [
+
+            m("br"),
+            m("input", {
+                placeholder: "name...",
+                oninput: m.withAttr("value", ctrl.createName)
+            }),
+            m("button", {
+                onclick: function(e) {
+                    m.request({
+                        method: 'post',
+                        url: "/create",
+                        data: {
+                            type: "folder",
+                            path: ctrl.path(),
+                            name: ctrl.createName()
+                        }
+                    }).then(m.route(m.route())).catch(e => {
+                        alert(JSON.stringify(e, null, "\t"))
+                    })
+                    e.preventDefault()
+                }
+            }, "create as folder"),
+            m("button", {
+                onclick: function(e) {
+                    m.request({
+                        method: 'post',
+                        url: "/create",
+                        data: {
+                            type: "file",
+                            path: ctrl.path(),
+                            name: ctrl.createName()
+                        }
+                    }).then(m.route(m.route()))
+                    e.preventDefault()
+                }
+            }, "create as file"),
+        ]),
+        m("ul", files().content.map(function(file) {
+            return m("a", {
+                href: "javascript:void(0);",
+                onclick: function(e) {
+                    ctrl.path(ctrl.path() + (ctrl.path() == "" ? "" : "/") + file)
+
+                    console.log(ctrl.path())
+                    m.route("/", {
+                            path: ctrl.path()
+                        })
+                        // m.redraw()
+                }
+            }, file + " ", [
+                m("button", "delete"),
+                m("button", "edit"),
+            ], m("br"))
+        }))
+    ])
 }
 
 function showContent(ctrl, files) {
-    return m("pre", files().content)
+    return m("editor", [
+        m("pre", {
+            contenteditable: true
+        }, files().content),
+        m("button", "save")
+    ])
 }
 
 m.route.mode = "hash"
